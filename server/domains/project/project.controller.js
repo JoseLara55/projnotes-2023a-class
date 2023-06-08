@@ -1,24 +1,27 @@
+// Importing winston logger
 import log from '../../config/winston';
 
 // Importando el modelo
 import ProjectModel from './project.model';
 
+// Importando Httperrors
+
 // Actions methods
 // GET "/project"
 const showDashboard = async (req, res) => {
-  // Consultando todos los proyectos
+  // Consultado todos los proyectos
   const projects = await ProjectModel.find({}).lean().exec();
   // Enviando los proyectos al cliente en JSON
+  log.info('Se entrega dashboard de proyectos');
   res.render('project/dashboardView', { projects });
 };
 
-// Actions methods
 // GET "/project/add"
 const add = (req, res) => {
   res.render('project/addView');
 };
 
-// POST /project/add
+// POST "/project/add"
 const addPost = async (req, res) => {
   // Rescatando la info del formulario
   const { errorData: validationError } = req;
@@ -26,23 +29,31 @@ const addPost = async (req, res) => {
   // se le informa al cliente
   if (validationError) {
     log.info('Se entrega al cliente error de validación de add Project');
-    res.status(422).json(validationError);
+    // Se desestructuran los datos de validación
+    const { value: project } = validationError;
+    // Se extraen los campos que fallaron en la validación
+    const errorModel = validationError.inner.reduce((prev, curr) => {
+      // Creando una variable temporal para
+      // evitar el error "no-param-reassing"
+      const workingPrev = prev;
+      workingPrev[`${curr.path}`] = curr.message;
+      return workingPrev;
+    }, {});
+    return res.status(422).render('project/addView', { project, errorModel });
   }
-  /*
-    En caso de que pase la validación
-    se desestructura la información
-    de la petición
-    */
+  // En caso de que pase la validación
+  // Se desestructura la información
+  // de la peticion
   const { validData: project } = req;
   try {
-    /*
-    Creando la instancia de un documento
-    con los valores de 'project'
-     */
+    // Creando la instancia de un documento
+    // con los valores de 'project'
     const savedProject = await ProjectModel.create(project);
     // Se contesta la información del proyecto al cliente
     log.info(`Se carga proyecto ${savedProject}`);
-    log.info('Se redirecciona el sitema a /project');
+    log.info('Se redirecciona el sistema a /project');
+    // Agregando mensaje de flash
+    req.flash('successMessage', 'Proyecto agregado con exito');
     return res.redirect('/project');
   } catch (error) {
     log.error(
@@ -67,7 +78,6 @@ const edit = async (req, res) => {
         .json({ fail: `No se encontro el proyecto con el id: ${id}` });
     }
     // Se manda a renderizar la vista de edición
-    // res.render('project/editView', { id });
     log.info(`Proyecto encontrado con el id: ${id}`);
     return res.render('project/editView', { project });
   } catch (error) {
@@ -82,15 +92,15 @@ const editPut = async (req, res) => {
   // Rescatando la info del formulario
   const { errorData: validationError } = req;
   // En caso de haber error
-  // Se le informa al cliente
+  // se le informa al cliente
   if (validationError) {
     log.info(`Error de validación del proyecto con id: ${id}`);
     // Se desestructuran los datos de validación
     const { value: project } = validationError;
-    // Se exytaen los campos que fallaron en la validación
+    // Se extraen los campos que fallaron en la validación
     const errorModel = validationError.inner.reduce((prev, curr) => {
       // Creando una variable temporal para
-      // Evitar el error "no-param-reassing"
+      // evitar el error "no-param-reassing"
       const workingPrev = prev;
       workingPrev[`${curr.path}`] = curr.message;
       return workingPrev;
@@ -98,12 +108,13 @@ const editPut = async (req, res) => {
     return res.status(422).render('project/editView', { project, errorModel });
   }
   // Si no hay error
+
   const project = await ProjectModel.findOne({ _id: id });
-  if (project == null) {
+  if (project === null) {
     log.info(`No se encontro documento para actualizar con id: ${id}`);
     return res
       .status(404)
-      .send(`No se encontro documento para actualizar con el id: ${id}`);
+      .send(`No se encontro documento para actualizar con id: ${id}`);
   }
   // En caso de encontrarse el documento se actualizan los datos
   const { validData: newProject } = req;
@@ -111,8 +122,9 @@ const editPut = async (req, res) => {
   project.description = newProject.description;
   try {
     // Se salvan los cambios
-    log.info(`Actualizando el proyecto con id: ${id}`);
+    log.info(`Actualizando proyecto con id: ${id}`);
     await project.save();
+    req.flash('successMessage', 'Proyecto editado con exito');
     return res.redirect(`/project/edit/${id}`);
   } catch (error) {
     log.error(`Error al actualizar proyecto con id: ${id}`);
@@ -127,14 +139,17 @@ const deleteProject = async (req, res) => {
   // Usando el modelo para borrar el proyecto
   try {
     const result = await ProjectModel.findByIdAndRemove(id);
+    // Agregando mensaje de flash
+    req.flash('successMessage', 'Proyecto borrado con exito');
     return res.status(200).json(result);
   } catch (error) {
     return res.status(500).json(error);
   }
 };
 
-// Controlador Project
+// Controlador user
 export default {
+  // Action Methods
   showDashboard,
   add,
   addPost,
