@@ -1,105 +1,145 @@
+// helps  to handle http errors
 import createError from 'http-errors';
-
-// import the express library
+// import the Express Librari
 import express from 'express';
-
+// Enable put and delete verbs
+// eslint-disable-next-line import/no-extraneous-dependencies
+import methodOverride from 'method-override';
+// is a Core-Node library to manage systems paths
 import path from 'path';
-
+// helps to parse client cookies
 import cookieParser from 'cookie-parser';
-// Library to log http communication
-import logger from 'morgan'
+// library to log  http comunication
+import morgan from 'morgan';
 
-//Importing subroutes
-import indexRouter from '@server/routes/index'
+/* importing sub routes
+import indexRouter from '@server/routes/index';
 import usersRouter from '@server/routes/users';
 import apiRouter from '@server/routes/api';
+*/
 
-//Setting Webpack Modules
-
+// Setting Webpack modules
+// eslint-disable-next-line import/no-extraneous-dependencies
 import webpack from 'webpack';
-import WebpackDevmiddlegare from 'webpack-dev-middleware';
+import WebpackDevMiddleware from 'webpack-dev-middleware';
 import WebpackHotMiddleware from 'webpack-hot-middleware';
 
-//Importing webpack Configuration 
+// Importando el configurador del motor de plantillas
+import configTemplateEngine from './config/templateEngine';
 
+// importing  webpack configuration
 import webpackConfig from '../webpack.dev.config';
 
-// We are creating the express instance
+// Importando configurador de sesiones
+import configSession from './config/configSessions';
+
+// Importando winston logger
+import log from './config/winston';
+
+// Importando enrutador
+import router from './router';
+
+// creando variable del directorio raíz
+// eslint-disable-next-line
+global["__rootdir"] = path.resolve(process.cwd());
+
 const app = express();
 
 // Get the execution mode
-
 const nodeEnviroment = process.env.NODE_ENV || 'production';
 
-// Deciding if we add  webpack middleware or not
-
-if (nodeEnviroment === 'development'){
-  //start webpack dev server
-  console.log ("🎧 Ejecutando el modo desarrollo");
-  // Adding the key
+// Deciding if we add webpack middleware or not
+if (nodeEnviroment === 'development') {
+  // Start webpack
+  console.log('💧 Ejecutando en modo desarrollo 💧');
+  // Adding the key mode with
   webpackConfig.mode = nodeEnviroment;
-
+  // Setting the port
   webpackConfig.devServer.port = process.env.PORT;
 
+  // Setting up Hot Module Replacement
   webpackConfig.entry = [
-    "webpack-hot-middleware/client?reload=true&timeout=1000", webpackConfig.entry];
+    'webpack-hot-middleware/client?reaload=true&timeout=1000',
+    webpackConfig.entry,
+  ];
 
-    const bundle = webpack (webpackConfig);
+  /* Agregar el plugin a la configuración de desarrollo
+  de  webpack */
+  webpackConfig.plugins.push(new webpack.HotModuleReplacementPlugin());
 
-    app.use(WebpackDevmiddlegare(bundle, {
-      publicPath: webpackConfig.output.PublicPath
-    }));
-
-    app.use(WebpackHotMiddleware(bundle));
-}else{
-  console.log("👘 Ejecutando modo produccion");
+  // Creating the bunbler
+  const bundle = webpack(webpackConfig);
+  // Enabling the express instances
+  app.use(
+    WebpackDevMiddleware(bundle, {
+      publicPath: webpackConfig.output.publicPath,
+    })
+  );
+  // Enabling the webpack HMR
+  app.use(WebpackHotMiddleware(bundle));
+} else {
+  console.log('🛎 Ejecutando en modo producción 🛎');
 }
 
 // view engine setup
-// We are declaring the localization of the views
-app.set('views', path.join(__dirname, 'views'));
-// Setting up the template engine
-app.set('view engine', 'hbs');
+// app.set('views', path.join(__dirname, 'views'));
+// app.set('view engine', 'hbs');
 
-//Registering midlewares
-//Log all received requests
-app.use(logger('dev'));
-/*app.use((req, res, next)=>{
-  console.log("👙We have receivend a request(Se ha recibido una petición)");
+// 👁⚙ MOTOR DE PLANTILLAS ⚙👁
+configTemplateEngine(app);
+
+// USE == REGISTERING MIDDLEWARE
+// app es una instancia de express
+app.use(morgan('dev', { stream: log.stream })); // log all received request //constructores de funciones -> generan funciones (req, res)
+/* app.use((req, res, next)=>{
+  //res.send("PÁGINA FUERA DE SERVICCIO");
+  console.log("A request has been / Se ha recibido una petición");
   next();
-});
+}); no se ejecutan los demás middleware por que el primero ya contesto,
+los middleware sí llevan orden de ejecución
 app.use((req, res, next)=>{
-  console.log(`😞IP: ${req.ip}`);
-  console.log(`🎮METHOD: ${req.method}`);
-});*/
-// Parse request data into jason
-app.use(express.json());
-// Decode url info
-app.use(express.urlencoded({ extended: false }));
-// Parse client Cookies into json
-app.use(cookieParser());
-//Set up the static file server
-app.use(express.static(path.join(__dirname, '../public')));
+  console.log(`🔑 IP: ${req.ip}`);
+  next();
+}) */
+app.use(express.json()); // Parse request data into json
+app.use(express.urlencoded({ extended: false })); // decode url info
+app.use(cookieParser()); // Parse client cookies into json
+// Enable post and delete verbs
+app.use(methodOverride('_method'));
 
-//Registering routes
+// Habilitando manejo de sesiones y mensajes flash
+configSession(app);
+// Set up the static file server
+app.use(
+  express.static(/* ruta de los estaticos */ path.join(__dirname, '../public'))
+);
+// path para que sirva en diferentes
+
+/* Registering routes
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
+app.use('/users', usersRouter); // Use permite definir un tramo de ruta
 app.use('/api', apiRouter);
+*/
+
+router.addRoutes(app);
 
 // catch 404 and forward to error handler
-app.use((req, res, next)=> {
+app.use((req, res, next) => {
+  log.info(`404 Pagina no encontrada ${req.method} ${req.originalUrl}`);
   next(createError(404));
 });
 
 // error handler
-app.use((err, req, res, next)=> {
+app.use((err, req, res) => {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
 
   // render the error page
   res.status(err.status || 500);
+  log.error(`${err.status || 500} - ${err.message}`);
   res.render('error');
 });
 
+// module.exports = app;
 export default app;
