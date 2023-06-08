@@ -1,88 +1,119 @@
+// helps  to handle http errors
 import createError from 'http-errors';
-
-// Creando variable del directorio raiz
-// eslint-disable-next-line
-// import the express library
+// import the Express Librari
 import express from 'express';
-
+// Enable put and delete verbs
+// eslint-disable-next-line import/no-extraneous-dependencies
+import methodOverride from 'method-override';
+// is a Core-Node library to manage systems paths
 import path from 'path';
-
+// helps to parse client cookies
 import cookieParser from 'cookie-parser';
-// Library to log http communication
+// library to log  http comunication
 import morgan from 'morgan';
 
-// importando el onfigurador de mootor de plantillas
+/* importing sub routes
+import indexRouter from '@server/routes/index';
+import usersRouter from '@server/routes/users';
+import apiRouter from '@server/routes/api';
+*/
 
-// Setting Webpack Modules
-
+// Setting Webpack modules
 // eslint-disable-next-line import/no-extraneous-dependencies
 import webpack from 'webpack';
-import WebpackDevmiddlegare from 'webpack-dev-middleware';
+import WebpackDevMiddleware from 'webpack-dev-middleware';
 import WebpackHotMiddleware from 'webpack-hot-middleware';
 
+// Importando el configurador del motor de plantillas
 import configTemplateEngine from './config/templateEngine';
 
-// Importing webpack Configuration
-
+// importing  webpack configuration
 import webpackConfig from '../webpack.dev.config';
 
-// Impornting winston logger
+// Importando winston logger
 import log from './config/winston';
 
 // Importando enrutador
 import router from './router';
 
-// We are creating the express instance
+// creando variable del directorio raíz
+// eslint-disable-next-line
+global["__rootdir"] = path.resolve(process.cwd());
+
 const app = express();
 
 // Get the execution mode
-
 const nodeEnviroment = process.env.NODE_ENV || 'production';
 
-// Deciding if we add  webpack middleware or not
-
+// Deciding if we add webpack middleware or not
 if (nodeEnviroment === 'development') {
-  // start webpack dev server
-  console.log('🎧 Ejecutando el modo desarrollo');
-  // Adding the key
+  // Start webpack
+  console.log('💧 Ejecutando en modo desarrollo 💧');
+  // Adding the key mode with
   webpackConfig.mode = nodeEnviroment;
-
+  // Setting the port
   webpackConfig.devServer.port = process.env.PORT;
 
+  // Setting up Hot Module Replacement
   webpackConfig.entry = [
-    'webpack-hot-middleware/client?reload=true&timeout=1000',
+    'webpack-hot-middleware/client?reaload=true&timeout=1000',
     webpackConfig.entry,
   ];
 
+  /* Agregar el plugin a la configuración de desarrollo
+  de  webpack */
   webpackConfig.plugins.push(new webpack.HotModuleReplacementPlugin());
 
+  // Creating the bunbler
   const bundle = webpack(webpackConfig);
-
+  // Enabling the express instances
   app.use(
-    WebpackDevmiddlegare(bundle, {
-      publicPath: webpackConfig.output.PublicPath,
+    WebpackDevMiddleware(bundle, {
+      publicPath: webpackConfig.output.publicPath,
     })
   );
-
+  // Enabling the webpack HMR
   app.use(WebpackHotMiddleware(bundle));
 } else {
-  console.log('👘 Ejecutando modo produccion');
+  console.log('🛎 Ejecutando en modo producción 🛎');
 }
 
-// View Engine Setup
+// view engine setup
+// app.set('views', path.join(__dirname, 'views'));
+// app.set('view engine', 'hbs');
+
+// 👁⚙ MOTOR DE PLANTILLAS ⚙👁
 configTemplateEngine(app);
 
-// Registering midlewares
-// Log all received requests
-app.use(morgan('combined', { stream: log.stream }));
-// Parse request data into jason
-app.use(express.json());
-// Decode url info
-app.use(express.urlencoded({ extended: false }));
-// Parse client Cookies into json
-app.use(cookieParser());
+// USE == REGISTERING MIDDLEWARE
+// app es una instancia de express
+app.use(morgan('dev', { stream: log.stream })); // log all received request //constructores de funciones -> generan funciones (req, res)
+/* app.use((req, res, next)=>{
+  //res.send("PÁGINA FUERA DE SERVICCIO");
+  console.log("A request has been / Se ha recibido una petición");
+  next();
+}); no se ejecutan los demás middleware por que el primero ya contesto,
+los middleware sí llevan orden de ejecución
+app.use((req, res, next)=>{
+  console.log(`🔑 IP: ${req.ip}`);
+  next();
+}) */
+app.use(express.json()); // Parse request data into json
+app.use(express.urlencoded({ extended: false })); // decode url info
+app.use(cookieParser()); // Parse client cookies into json
+// Enable post and delete verbs
+app.use(methodOverride('_method'));
 // Set up the static file server
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(
+  express.static(/* ruta de los estaticos */ path.join(__dirname, '../public'))
+);
+// path para que sirva en diferentes
+
+/* Registering routes
+app.use('/', indexRouter);
+app.use('/users', usersRouter); // Use permite definir un tramo de ruta
+app.use('/api', apiRouter);
+*/
 
 router.addRoutes(app);
 
@@ -104,4 +135,5 @@ app.use((err, req, res) => {
   res.render('error');
 });
 
+// module.exports = app;
 export default app;
